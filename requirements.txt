@@ -1,0 +1,5 @@
+upsonic>=0.34.3
+playwright>=1.40.0
+open-interpreter>=0.1.11
+pip>=25.0.1
+requests>=2.31.0 

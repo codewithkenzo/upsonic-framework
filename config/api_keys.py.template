@@ -1,0 +1,14 @@
+"""
+API keys for various services used by the Upsonic Framework.
+
+Copy this file to api_keys.py and fill in your API keys.
+"""
+
+# OpenRouter API key for accessing various LLMs
+# Get yours at https://openrouter.ai/keys
+OPENROUTER_API_KEY = "your_openrouter_api_key_here"
+
+# Other API keys you might want to add:
+# ANTHROPIC_API_KEY = "your_anthropic_api_key_here"
+# OPENAI_API_KEY = "your_openai_api_key_here"
+# GOOGLE_API_KEY = "your_google_api_key_here" 
