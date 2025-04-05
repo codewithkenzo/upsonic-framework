@@ -19,43 +19,57 @@ def mock_browser_tool():
     with patch('src.browser_agent.BrowserTool') as MockBrowserTool:
         # Configure the mock to return success responses
         mock_tool = MockBrowserTool.return_value
-        mock_tool.start = MagicMock(return_value=asyncio.Future())
-        mock_tool.start.return_value.set_result({"status": "success"})
         
-        mock_tool.go_to = MagicMock(return_value=asyncio.Future())
-        mock_tool.go_to.return_value.set_result({
-            "status": "success", 
-            "title": "Test Page", 
-            "url": "https://example.com"
-        })
+        # Create futures with a running event loop to avoid warnings
+        async def create_future_result(result):
+            future = asyncio.get_running_loop().create_future()
+            future.set_result(result)
+            return future
         
-        mock_tool.get_text = MagicMock(return_value=asyncio.Future())
-        mock_tool.get_text.return_value.set_result({
-            "status": "success",
-            "text": "Test content",
-            "title": "Test Page"
-        })
+        async def mock_start():
+            return await create_future_result({"status": "success"})
+        mock_tool.start = MagicMock(side_effect=mock_start)
         
-        mock_tool.screenshot = MagicMock(return_value=asyncio.Future())
-        mock_tool.screenshot.return_value.set_result({
-            "status": "success",
-            "path": "/path/to/screenshot.png"
-        })
+        async def mock_go_to(url):
+            return await create_future_result({
+                "status": "success", 
+                "title": "Test Page", 
+                "url": url
+            })
+        mock_tool.go_to = MagicMock(side_effect=mock_go_to)
         
-        mock_tool.click = MagicMock(return_value=asyncio.Future())
-        mock_tool.click.return_value.set_result({
-            "status": "success",
-            "selector": "#test-button"
-        })
+        async def mock_get_text():
+            return await create_future_result({
+                "status": "success",
+                "text": "Test content",
+                "title": "Test Page"
+            })
+        mock_tool.get_text = MagicMock(side_effect=mock_get_text)
         
-        mock_tool.wait_for_selector = MagicMock(return_value=asyncio.Future())
-        mock_tool.wait_for_selector.return_value.set_result({
-            "status": "success",
-            "selector": "h1"
-        })
+        async def mock_screenshot(path=None):
+            return await create_future_result({
+                "status": "success",
+                "path": path or "/path/to/screenshot.png"
+            })
+        mock_tool.screenshot = MagicMock(side_effect=mock_screenshot)
         
-        mock_tool.stop = MagicMock(return_value=asyncio.Future())
-        mock_tool.stop.return_value.set_result({"status": "success"})
+        async def mock_click(selector):
+            return await create_future_result({
+                "status": "success",
+                "selector": selector
+            })
+        mock_tool.click = MagicMock(side_effect=mock_click)
+        
+        async def mock_wait_for_selector(selector, timeout=30000):
+            return await create_future_result({
+                "status": "success",
+                "selector": selector
+            })
+        mock_tool.wait_for_selector = MagicMock(side_effect=mock_wait_for_selector)
+        
+        async def mock_stop():
+            return await create_future_result({"status": "success"})
+        mock_tool.stop = MagicMock(side_effect=mock_stop)
         
         yield mock_tool
 
