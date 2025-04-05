@@ -31,6 +31,14 @@ async def main():
         if result["status"] == "success":
             print(f"Successfully loaded page: {result['title']}")
             
+            # Wait for a specific element to appear
+            print("Waiting for page content to load...")
+            wait_result = await browser_agent.wait_for_element("h1", timeout=5000)
+            if wait_result["status"] == "success":
+                print("Page content loaded successfully")
+            else:
+                print(f"Error waiting for element: {wait_result['error']}")
+            
             # Extract text content
             content_result = await browser_agent.get_page_text()
             if content_result["status"] == "success":
