@@ -71,21 +71,23 @@ async def main():
         page_count += 1
         
         # Browse to the URL
-        success, error = browser_agent.browse(current_url)
-        if not success:
-            print(f"Error browsing to {current_url}: {error}")
+        result = await browser_agent.browse(current_url)
+        if result["status"] != "success":
+            print(f"Error browsing to {current_url}: {result.get('error', 'Unknown error')}")
             continue
         
         # Get page content
-        content_success, content = browser_agent.get_page_text()
-        if not content_success or not content:
+        content_result = await browser_agent.get_page_text()
+        if content_result["status"] != "success" or not content_result.get("text"):
             print(f"Failed to extract content from {current_url}")
             continue
         
+        content = content_result["text"]
+        
         # Take a screenshot
-        screenshot_success, screenshot_path = browser_agent.take_screenshot()
-        if screenshot_success:
-            print(f"Screenshot saved to: {screenshot_path}")
+        screenshot_result = await browser_agent.take_screenshot()
+        if screenshot_result["status"] == "success":
+            print(f"Screenshot saved to: {screenshot_result['path']}")
         
         # Process the content with LLM
         prompt = f"""
@@ -188,7 +190,7 @@ async def main():
         print(f"Error creating summary: {str(e)}")
     
     # Close the browser
-    browser_agent.stop_browser()
+    await browser_agent.stop()
     print(f"\nScraping completed. Processed {page_count} pages.")
 
 if __name__ == "__main__":
