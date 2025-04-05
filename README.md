@@ -11,6 +11,7 @@ A modular framework for building AI agent teams that can work together to handle
 - **Memory Support**: Agents can maintain context over time
 - **Direct LLM Calls**: Make direct calls to LLMs for simpler tasks
 - **Browser Agent**: Web browsing capabilities using Playwright
+- **Vision Capabilities**: Process and analyze images with vision-enabled LLMs
 
 ## Installation
 
@@ -66,6 +67,30 @@ direct_result = agent.direct_llm_call("Summarize the knowledge in one sentence")
 print(direct_result)
 ```
 
+### Vision Capabilities
+
+You can use vision-enabled models to analyze images:
+
+```python
+from src.llm_integration import LLMClient
+from config.llm_config import get_vision_models
+
+# Get available vision models
+vision_models = get_vision_models()
+print(f"Available vision models: {', '.join(vision_models)}")
+
+# Create LLM client
+client = LLMClient()
+
+# Process an image
+result = client.generate(
+    prompt="Describe what you see in this image in detail.",
+    model_name="gpt-4o",  # Use a vision-capable model
+    image_paths=["path/to/your/image.jpg"]
+)
+print(result)
+```
+
 ### Browser Agent Example
 
 ```python
@@ -118,6 +143,9 @@ python app.py task <agent_id> "What is the capital of France?"
 # Make a direct LLM call
 python app.py direct "What is the meaning of life?" --model "gpt-4o"
 
+# Make a direct LLM call with an image
+python app.py direct "What's in this image?" --model "gpt-4o" --image "path/to/image.jpg"
+
 # Create a browser agent and browse a website
 python app.py browser https://docs.upsonic.ai/introduction --task "Summarize this page" --model "gpt-4o"
 
@@ -154,6 +182,7 @@ The `examples` directory contains example scripts demonstrating how to use the f
 - **simple_agent.py**: Basic usage of agents, knowledge bases, and parallel tasks
 - **browser_agent_example.py**: Example of using the browser agent
 - **cli_browser_agent.sh**: Shell script showcasing CLI browser agent commands
+- **vision_test.py**: Example of analyzing images with vision-enabled LLMs
 
 ## License
 

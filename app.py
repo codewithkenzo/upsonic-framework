@@ -35,6 +35,7 @@ def parse_args():
     direct_parser = subparsers.add_parser("direct", help="Make a direct LLM call")
     direct_parser.add_argument("prompt", help="Prompt for the LLM")
     direct_parser.add_argument("--model", help="Model to use", default="llama3-70b")
+    direct_parser.add_argument("--image", action="append", help="Path to an image file to analyze (can be specified multiple times)")
     
     # Browser command
     browser_parser = subparsers.add_parser("browser", help="Create a browser agent and browse a website")
@@ -125,7 +126,7 @@ def main():
         
         # Create and process the task
         task = Task(args.prompt)
-        result = llm_client.process_task(task, model_name=args.model)
+        result = llm_client.process_task(task, model_name=args.model, image_paths=args.image)
         print(f"\nResult: {result}")
         
     elif args.command == "browser":

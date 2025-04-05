@@ -4,6 +4,7 @@ Module for direct integration with LLMs via OpenRouter.
 
 import os
 import json
+import base64
 import requests
 from typing import Dict, Any, Optional, List, Union
 
@@ -34,6 +35,7 @@ class LLMClient:
         max_tokens: int = 1000,
         temperature: float = 0.7,
         stop_sequences: Optional[List[str]] = None,
+        image_paths: Optional[List[str]] = None,
     ) -> str:
         """Generate text from the LLM.
         
@@ -44,6 +46,7 @@ class LLMClient:
             max_tokens (int, optional): Maximum number of tokens to generate. Defaults to 1000.
             temperature (float, optional): Temperature for generation. Defaults to 0.7.
             stop_sequences (List[str], optional): Sequences that will stop generation. Defaults to None.
+            image_paths (List[str], optional): Paths to images to include in the prompt. Defaults to None.
             
         Returns:
             str: Generated text.
@@ -63,7 +66,30 @@ class LLMClient:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+        
+        # Handle text and images in the prompt
+        if image_paths:
+            content = []
+            # Add the prompt as text first
+            if prompt:
+                content.append({"type": "text", "text": prompt})
+            
+            # Add images
+            for image_path in image_paths:
+                if os.path.exists(image_path):
+                    with open(image_path, "rb") as img_file:
+                        # Convert image to base64
+                        base64_image = base64.b64encode(img_file.read()).decode('utf-8')
+                        content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        })
+            messages.append({"role": "user", "content": content})
+        else:
+            # Just text prompt
+            messages.append({"role": "user", "content": prompt})
         
         # Prepare request body
         body = {
@@ -94,12 +120,18 @@ class LLMClient:
             print(f"Error generating text: {e}")
             return f"Error generating text: {e}"
             
-    def process_task(self, task: Task, model_name: Optional[str] = None) -> str:
+    def process_task(
+        self, 
+        task: Task, 
+        model_name: Optional[str] = None,
+        image_paths: Optional[List[str]] = None,
+    ) -> str:
         """Process a task using the LLM.
         
         Args:
             task (Task): The task to process.
             model_name (str, optional): Name of the model to use. If not provided, the default model will be used.
+            image_paths (List[str], optional): Paths to images to include in the prompt. Defaults to None.
             
         Returns:
             str: Generated text.
@@ -135,5 +167,6 @@ class LLMClient:
         # Generate the response
         return self.generate(
             prompt=final_prompt,
-            model_name=model_name
+            model_name=model_name,
+            image_paths=image_paths
         ) 
