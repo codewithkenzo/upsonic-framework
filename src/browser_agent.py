@@ -211,6 +211,28 @@ class BrowserTool:
                 "status": "error",
                 "error": str(e)
             }
+            
+    async def wait_for_selector(self, selector, timeout=30000):
+        """Wait for an element to appear on the page.
+        
+        Args:
+            selector (str): Selector for the element to wait for.
+            timeout (int, optional): Maximum time to wait in milliseconds. Defaults to 30000.
+            
+        Returns:
+            dict: Result of the operation.
+        """
+        try:
+            await self.page.wait_for_selector(selector, timeout=timeout)
+            return {
+                "status": "success",
+                "selector": selector
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e)
+            }
 
 class BrowserAgent(BaseAgent):
     """Agent for browser automation."""
@@ -336,6 +358,18 @@ class BrowserAgent(BaseAgent):
             dict: Result of the operation.
         """
         return await self.browser_tool.evaluate(script)
+        
+    async def wait_for_element(self, selector, timeout=30000):
+        """Wait for an element to appear on the page.
+        
+        Args:
+            selector (str): CSS selector for the element to wait for.
+            timeout (int, optional): Maximum time to wait in milliseconds. Defaults to 30000.
+            
+        Returns:
+            dict: Result of the operation.
+        """
+        return await self.browser_tool.wait_for_selector(selector, timeout)
         
     async def stop(self):
         """Stop the browser."""
