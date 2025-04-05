@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upsonic API Test Client</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .alert {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #bee5eb;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: inherit;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .response {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        .error {
+            border-left: 4px solid #e74c3c;
+        }
+        .checkbox-group {
+            margin: 10px 0;
+        }
+        img.screenshot {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upsonic API Test Client</h1>
+
+    <div class="info">
+        <strong>Usage:</strong> This client interacts with the API server running at <code>http://localhost:8000</code>. 
+        Make sure the server is running by executing <code>python api/run_api.py</code> before using this page.
+        <br><br>
+        <strong>Important:</strong> Open this HTML file directly in your browser. Don't try to access it through the server URL.
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('tab-llm')">LLM</div>
+        <div class="tab" onclick="switchTab('tab-agents')">Agents</div>
+        <div class="tab" onclick="switchTab('tab-browser')">Browser Agents</div>
+    </div>
+
+    <div id="tab-llm" class="tab-content active">
+        <div class="card">
+            <h2>Direct LLM Query</h2>
+            <textarea id="llm-prompt" rows="5" placeholder="Enter your prompt here..."></textarea>
+            <input type="text" id="llm-model" placeholder="Model name (optional)">
+            <button onclick="callLLM()">Submit</button>
+            <div id="llm-response" class="response" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div id="tab-agents" class="tab-content">
+        <div class="card">
+            <h2>Create Agent</h2>
+            <input type="text" id="agent-name" placeholder="Agent name">
+            <input type="text" id="agent-description" placeholder="Agent description">
+            <input type="text" id="agent-model" placeholder="Model name (optional)">
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="agent-memory"> Enable memory
+                </label>
+            </div>
+            <button onclick="createAgent()">Create</button>
+            <div id="agent-response" class="response" style="display: none;"></div>
+        </div>
+
+        <div class="card">
+            <h2>Execute Task</h2>
+            <input type="text" id="task-agent-id" placeholder="Agent ID">
+            <textarea id="task-prompt" rows="5" placeholder="Enter the task..."></textarea>
+            <button onclick="executeTask()">Execute</button>
+            <div id="task-response" class="response" style="display: none;"></div>
+        </div>
+
+        <div class="card">
+            <h2>List Agents</h2>
+            <button onclick="listAgents()">Get Agents</button>
+            <div id="agents-response" class="response" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div id="tab-browser" class="tab-content">
+        <div class="card">
+            <h2>Create Browser Agent</h2>
+            <input type="text" id="browser-agent-name" placeholder="Agent name">
+            <input type="text" id="browser-agent-description" placeholder="Agent description">
+            <input type="text" id="browser-agent-model" placeholder="Model name (optional)">
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="browser-agent-memory"> Enable memory
+                </label>
+            </div>
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="browser-agent-headless" checked> Headless mode
+                </label>
+            </div>
+            <button onclick="createBrowserAgent()">Create</button>
+            <div id="browser-agent-response" class="response" style="display: none;"></div>
+        </div>
+
+        <div class="card">
+            <h2>Browse URL</h2>
+            <input type="text" id="browse-agent-id" placeholder="Browser Agent ID">
+            <input type="text" id="browse-url" placeholder="URL to browse">
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="browse-get-content" checked> Get page content
+                </label>
+            </div>
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" id="browse-take-screenshot" checked> Take screenshot
+                </label>
+            </div>
+            <button onclick="browseUrl()">Browse</button>
+            <div id="browse-response" class="response" style="display: none;"></div>
+            <img id="browse-screenshot" class="screenshot" style="display: none;">
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function showResponse(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+            element.style.display = 'block';
+            if (isError) {
+                element.classList.add('error');
+            } else {
+                element.classList.remove('error');
+            }
+        }
+
+        async function makeRequest(url, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(url, options);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Unknown error occurred');
+                }
+
+                return data;
+            } catch (error) {
+                console.error('API request failed:', error);
+                throw error;
+            }
+        }
+
+        async function callLLM() {
+            const prompt = document.getElementById('llm-prompt').value;
+            const model = document.getElementById('llm-model').value;
+            
+            if (!prompt) {
+                showResponse('llm-response', 'Please enter a prompt', true);
+                return;
+            }
+
+            try {
+                const data = await makeRequest(`${API_BASE}/llm/direct`, 'POST', {
+                    prompt,
+                    model: model || undefined
+                });
+                showResponse('llm-response', data);
+            } catch (error) {
+                showResponse('llm-response', error.message, true);
+            }
+        }
+
+        async function createAgent() {
+            const name = document.getElementById('agent-name').value;
+            const description = document.getElementById('agent-description').value;
+            const model = document.getElementById('agent-model').value;
+            const memory = document.getElementById('agent-memory').checked;
+            
+            if (!name || !description) {
+                showResponse('agent-response', 'Name and description are required', true);
+                return;
+            }
+
+            try {
+                const data = await makeRequest(`${API_BASE}/agents/create`, 'POST', {
+                    name,
+                    description,
+                    model_name: model || undefined,
+                    enable_memory: memory
+                });
+                showResponse('agent-response', data);
+            } catch (error) {
+                showResponse('agent-response', error.message, true);
+            }
+        }
+
+        async function executeTask() {
+            const agentId = document.getElementById('task-agent-id').value;
+            const task = document.getElementById('task-prompt').value;
+            
+            if (!agentId || !task) {
+                showResponse('task-response', 'Agent ID and task are required', true);
+                return;
+            }
+
+            try {
+                const data = await makeRequest(`${API_BASE}/agents/${agentId}/execute`, 'POST', {
+                    task
+                });
+                showResponse('task-response', data);
+            } catch (error) {
+                showResponse('task-response', error.message, true);
+            }
+        }
+
+        async function listAgents() {
+            try {
+                const data = await makeRequest(`${API_BASE}/agents`);
+                showResponse('agents-response', data);
+            } catch (error) {
+                showResponse('agents-response', error.message, true);
+            }
+        }
+
+        async function createBrowserAgent() {
+            const name = document.getElementById('browser-agent-name').value;
+            const description = document.getElementById('browser-agent-description').value;
+            const model = document.getElementById('browser-agent-model').value;
+            const memory = document.getElementById('browser-agent-memory').checked;
+            const headless = document.getElementById('browser-agent-headless').checked;
+            
+            if (!name || !description) {
+                showResponse('browser-agent-response', 'Name and description are required', true);
+                return;
+            }
+
+            try {
+                const data = await makeRequest(`${API_BASE}/browser_agents/create`, 'POST', {
+                    name,
+                    description,
+                    model_name: model || undefined,
+                    enable_memory: memory,
+                    headless: headless
+                });
+                showResponse('browser-agent-response', data);
+            } catch (error) {
+                showResponse('browser-agent-response', error.message, true);
+            }
+        }
+
+        async function browseUrl() {
+            const agentId = document.getElementById('browse-agent-id').value;
+            const url = document.getElementById('browse-url').value;
+            const getContent = document.getElementById('browse-get-content').checked;
+            const takeScreenshot = document.getElementById('browse-take-screenshot').checked;
+            
+            if (!agentId || !url) {
+                showResponse('browse-response', 'Agent ID and URL are required', true);
+                return;
+            }
+
+            // Hide previous screenshot if any
+            document.getElementById('browse-screenshot').style.display = 'none';
+
+            try {
+                const data = await makeRequest(`${API_BASE}/browser_agents/${agentId}/browse`, 'POST', {
+                    url,
+                    get_content: getContent,
+                    take_screenshot: takeScreenshot
+                });
+                
+                showResponse('browse-response', data);
+                
+                // Display screenshot if available
+                if (data.screenshot) {
+                    const screenshotImg = document.getElementById('browse-screenshot');
+                    screenshotImg.src = `file://${data.screenshot}`;
+                    screenshotImg.style.display = 'block';
+                }
+            } catch (error) {
+                showResponse('browse-response', error.message, true);
+            }
+        }
+    </script>
+</body>
+</html> 
