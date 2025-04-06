@@ -1,0 +1,159 @@
+{
+  "servers": {
+    "desktop-commander": {
+      "name": "desktop-commander",
+      "description": "Command your desktop with natural language",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@wonderwhy-er/desktop-commander"
+      ],
+      "categories": ["desktop", "automation"],
+      "capabilities": ["control_desktop", "screenshot", "find_ui_elements"],
+      "env": {},
+      "auto_start": false
+    },
+    "playwright": {
+      "name": "playwright",
+      "description": "Web browser automation and interaction",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ],
+      "categories": ["web", "browser", "automation"],
+      "capabilities": ["navigate", "click", "type", "screenshot"],
+      "env": {
+        "PLAYWRIGHT_EXECUTABLE_PATH": "/usr/bin/chromium",
+        "PLAYWRIGHT_BROWSER_NAME": "chromium"
+      },
+      "auto_start": false
+    },
+    "github": {
+      "name": "github",
+      "description": "GitHub integration for repositories and code",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "categories": ["code", "git", "development"],
+      "capabilities": ["search_repos", "get_code", "view_issues"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      },
+      "auto_start": false
+    },
+    "brave-search": {
+      "name": "brave-search",
+      "description": "Search the web using Brave Search API",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery-ai/brave-search"
+      ],
+      "categories": ["search", "web"],
+      "capabilities": ["search_web", "get_results"],
+      "env": {},
+      "auto_start": false
+    },
+    "hackernews": {
+      "name": "hackernews",
+      "description": "Hacker News content and discussion",
+      "command": "uvx",
+      "args": [
+        "mcp-hn"
+      ],
+      "categories": ["news", "tech", "community"],
+      "capabilities": ["get_stories", "get_comments", "search"],
+      "env": {},
+      "auto_start": false
+    },
+    "jira": {
+      "name": "jira",
+      "description": "Jira issue tracking and project management",
+      "command": "npx",
+      "args": [
+        "-y",
+        "jira-mcp"
+      ],
+      "categories": ["project", "management", "issues"],
+      "capabilities": ["get_issues", "create_issue", "update_issue"],
+      "env": {
+        "JIRA_API_TOKEN": "",
+        "JIRA_USER_EMAIL": "",
+        "JIRA_BASE_URL": ""
+      },
+      "auto_start": false
+    },
+    "slack": {
+      "name": "slack",
+      "description": "Slack messaging and channels",
+      "command": "npx",
+      "args": [
+        "-y",
+        "slack-mcp"
+      ],
+      "categories": ["communication", "chat", "team"],
+      "capabilities": ["send_message", "read_channels", "get_history"],
+      "env": {
+        "SLACK_BOT_TOKEN": "",
+        "SLACK_APP_TOKEN": ""
+      },
+      "auto_start": false
+    },
+    "filesystem": {
+      "name": "filesystem",
+      "description": "Access and manipulate file system",
+      "command": "npx",
+      "args": [
+        "-y",
+        "filesystem-mcp"
+      ],
+      "categories": ["files", "system", "storage"],
+      "capabilities": ["read_file", "write_file", "list_directory"],
+      "env": {},
+      "auto_start": false
+    },
+    "code-interpreter": {
+      "name": "code-interpreter",
+      "description": "Execute code and scripts",
+      "command": "npx",
+      "args": [
+        "-y",
+        "code-interpreter-mcp"
+      ],
+      "categories": ["code", "execution", "interpreter"],
+      "capabilities": ["run_python", "run_javascript", "show_output"],
+      "env": {},
+      "auto_start": false
+    },
+    "discord": {
+      "name": "discord",
+      "description": "Discord messaging and servers",
+      "command": "npx",
+      "args": [
+        "-y",
+        "discord-mcp"
+      ],
+      "categories": ["communication", "chat", "gaming"],
+      "capabilities": ["send_message", "read_channels", "get_servers"],
+      "env": {
+        "DISCORD_BOT_TOKEN": ""
+      },
+      "auto_start": false
+    },
+    "youtube-scraper": {
+      "name": "youtube-scraper",
+      "description": "YouTube video scraping and browsing",
+      "command": "python",
+      "args": ["scripts/youtube_scraper_mcp.py"],
+      "categories": ["video", "web", "scraping"],
+      "capabilities": ["navigate_to_youtube", "search_youtube", "scrape_video_results", "click_video", "scrape_video_comments", "close_browser"],
+      "auto_start": true
+    }
+  }
+} 

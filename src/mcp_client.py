@@ -11,6 +11,7 @@ import time
 import asyncio
 import logging
 import hashlib
+import sys
 from typing import Dict, List, Any, Optional, Union, Callable
 from pathlib import Path
 
@@ -21,21 +22,30 @@ logger = logging.getLogger("mcp_client")
 class MCPClient:
     """Client for interacting with MCP servers."""
     
-    def __init__(self, config_path: Optional[str] = None, mcp_manager_script: Optional[str] = None):
+    def __init__(self, config_path: Optional[str] = None):
         """
         Initialize the MCP client.
         
         Args:
             config_path (str, optional): Path to the MCP configuration file.
                 If not provided, the default ~/.cursor/mcp.json will be used.
-            mcp_manager_script (str, optional): Path to the MCP manager script
         """
         self.config_path = config_path or os.path.expanduser("~/.cursor/mcp.json")
+        
+        # Also check project config
+        project_config = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "mcp.json")
+        
+        if os.path.exists(project_config):
+            self.config_path = project_config
+            logger.info(f"Using project configuration: {project_config}")
+        
         self.config = self._load_config()
         self.running_servers = {}
         
         # Create an MCP manager instance
         try:
+            # First try to import our local MCP manager
+            sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
             from mcp_manager import MCPManager
             self._mcp_manager = MCPManager()
             logger.info("Using direct MCPManager instance")
@@ -43,17 +53,26 @@ class MCPClient:
             logger.warning("Could not import MCPManager, falling back to script-based interaction")
             self._mcp_manager = None
         
-        self._mcp_manager_script = mcp_manager_script or os.path.join(os.path.dirname(__file__), '..', 'scripts', 'mcp_manager.sh')
+        self._mcp_manager_script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "mcp_manager.py")
         self._active_servers = {}
-        
+    
     def _load_config(self) -> Dict[str, Any]:
         """Load the MCP configuration from file."""
         try:
             with open(self.config_path, 'r') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            # Return a default config if the file doesn't exist or is invalid
-            return {"mcpServers": {}}
+                config = json.load(f)
+                
+            # Support both old and new config formats
+            if "mcpServers" in config:
+                return config["mcpServers"]
+            elif "servers" in config:
+                return config["servers"]
+            else:
+                logger.warning(f"Invalid configuration format in {self.config_path}")
+                return {}
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.error(f"Error loading config from {self.config_path}: {str(e)}")
+            return {}
     
     def list_servers(self) -> List[Dict[str, Any]]:
         """
@@ -67,7 +86,7 @@ class MCPClient:
         
         try:
             result = subprocess.run(
-                [self._mcp_manager_script, 'list'],
+                [sys.executable, self._mcp_manager_script, 'list'],
                 capture_output=True,
                 text=True,
                 check=True
@@ -75,7 +94,76 @@ class MCPClient:
             return json.loads(result.stdout.strip())
         except Exception as e:
             logger.error(f"Error listing servers: {str(e)}")
-            return []
+            
+            # Fallback to config-based listing
+            servers = []
+            for server_name, server_config in self.config.items():
+                running = server_name in self.running_servers
+                
+                # Check if using new format
+                if isinstance(server_config, dict) and "name" in server_config:
+                    servers.append({
+                        "name": server_config["name"],
+                        "description": server_config.get("description", ""),
+                        "status": "running" if running else "available",
+                        "capabilities": server_config.get("capabilities", [])
+                    })
+                else:
+                    # Old style config
+                    servers.append({
+                        "name": server_name,
+                        "status": "running" if running else "available",
+                        "command": server_config.get("command"),
+                        "args": server_config.get("args", [])
+                    })
+            
+            return servers
+    
+    def get_server_status(self, server_name: str) -> Dict[str, Any]:
+        """
+        Get the status of an MCP server.
+        
+        Args:
+            server_name (str): Name of the server
+            
+        Returns:
+            Dict[str, Any]: Server status information
+        """
+        if hasattr(self, '_mcp_manager') and self._mcp_manager:
+            return self._mcp_manager.get_server_status(server_name)
+        
+        try:
+            result = subprocess.run(
+                [sys.executable, self._mcp_manager_script, 'status', server_name],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            return json.loads(result.stdout.strip())
+        except Exception as e:
+            logger.error(f"Error getting server status: {str(e)}")
+            
+            # Fallback: check if server is in config
+            if server_name not in self.config:
+                return {"status": "error", "message": f"Server '{server_name}' not found"}
+            
+            running = server_name in self.running_servers
+            server_config = self.config[server_name]
+            
+            # Check if using new format
+            if isinstance(server_config, dict) and "name" in server_config:
+                return {
+                    "name": server_config["name"],
+                    "status": "running" if running else "available",
+                    "description": server_config.get("description", ""),
+                    "capabilities": server_config.get("capabilities", [])
+                }
+            else:
+                # Old style config
+                return {
+                    "name": server_name,
+                    "status": "running" if running else "available"
+                }
     
     def start_server(self, server_name: str) -> Dict[str, Any]:
         """
@@ -85,76 +173,62 @@ class MCPClient:
             server_name (str): Name of the server to start
             
         Returns:
-            Dict[str, Any]: Server status information
-            
-        Raises:
-            ValueError: If the server is not found in the configuration
+            Dict[str, Any]: Status information
         """
-        if server_name not in self.config.get("mcpServers", {}):
-            raise ValueError(f"Unknown MCP server: {server_name}")
-            
-        if server_name in self.running_servers:
-            return {"name": server_name, "status": "already_running"}
-            
-        server_config = self.config["mcpServers"][server_name]
-        command = server_config.get("command")
-        args = server_config.get("args", [])
-        env = os.environ.copy()
+        if hasattr(self, '_mcp_manager') and self._mcp_manager:
+            return self._mcp_manager.start_server(server_name)
         
-        # Add any environment variables from the config
-        if "env" in server_config:
-            for key, value in server_config["env"].items():
-                env[key] = value
-                
-        # Start the server process
         try:
-            process = subprocess.Popen(
-                [command] + args,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+            result = subprocess.run(
+                [sys.executable, self._mcp_manager_script, 'start', server_name],
+                capture_output=True,
+                text=True,
+                check=True
             )
-            
-            # Store the process
-            self.running_servers[server_name] = {
-                "process": process,
-                "start_time": time.time(),
-                "stdout": [],
-                "stderr": []
-            }
-            
-            # Start threads to read output
-            self._start_output_threads(server_name)
-            
-            return {"name": server_name, "status": "started"}
+            status = json.loads(result.stdout.strip())
+            if status.get("status") == "started" or status.get("status") == "already_running":
+                self.running_servers[server_name] = True
+            return status
         except Exception as e:
-            return {"name": server_name, "status": "error", "error": str(e)}
-    
-    def _start_output_threads(self, server_name: str):
-        """Start threads to read stdout and stderr from the server process."""
-        server_info = self.running_servers[server_name]
-        process = server_info["process"]
-        
-        def read_stdout():
-            for line in iter(process.stdout.readline, ''):
-                if line.strip():
-                    server_info["stdout"].append(line.strip())
-                    # Limit the number of stored lines
-                    if len(server_info["stdout"]) > 1000:
-                        server_info["stdout"].pop(0)
-        
-        def read_stderr():
-            for line in iter(process.stderr.readline, ''):
-                if line.strip():
-                    server_info["stderr"].append(line.strip())
-                    # Limit the number of stored lines
-                    if len(server_info["stderr"]) > 1000:
-                        server_info["stderr"].pop(0)
-        
-        # Start the threads
-        threading.Thread(target=read_stdout, daemon=True).start()
-        threading.Thread(target=read_stderr, daemon=True).start()
+            logger.error(f"Error starting server: {str(e)}")
+            
+            # Fallback: check if server is in config
+            if server_name not in self.config:
+                return {"status": "error", "message": f"Server '{server_name}' not found"}
+            
+            server_config = self.config[server_name]
+            if server_name in self.running_servers:
+                return {"status": "already_running", "message": f"Server '{server_name}' is already running"}
+            
+            command = server_config.get("command")
+            args = server_config.get("args", [])
+            env = server_config.get("env", {})
+            
+            if not command:
+                return {"status": "error", "message": f"No command specified for server '{server_name}'"}
+            
+            try:
+                import subprocess
+                
+                # Merge environment variables
+                merged_env = os.environ.copy()
+                merged_env.update(env)
+                
+                # Start the process
+                full_command = [command] + args
+                process = subprocess.Popen(
+                    full_command,
+                    env=merged_env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                self.running_servers[server_name] = process
+                
+                return {"status": "started", "message": f"Server '{server_name}' started successfully"}
+            except Exception as e:
+                return {"status": "error", "message": f"Error starting server '{server_name}' directly: {str(e)}"}
     
     def stop_server(self, server_name: str) -> Dict[str, Any]:
         """
@@ -164,123 +238,51 @@ class MCPClient:
             server_name (str): Name of the server to stop
             
         Returns:
-            Dict[str, Any]: Server status information
+            Dict[str, Any]: Status information
         """
-        if server_name not in self.running_servers:
-            return {"name": server_name, "status": "not_running"}
-            
-        server_info = self.running_servers[server_name]
-        process = server_info["process"]
+        if hasattr(self, '_mcp_manager') and self._mcp_manager:
+            return self._mcp_manager.stop_server(server_name)
         
         try:
-            process.terminate()
-            # Wait for the process to terminate
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                # Force kill if it doesn't terminate
-                process.kill()
-                
-            # Remove from running servers
-            del self.running_servers[server_name]
-            
-            return {"name": server_name, "status": "stopped"}
+            result = subprocess.run(
+                [sys.executable, self._mcp_manager_script, 'stop', server_name],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            status = json.loads(result.stdout.strip())
+            if status.get("status") == "stopped":
+                if server_name in self.running_servers:
+                    del self.running_servers[server_name]
+            return status
         except Exception as e:
-            return {"name": server_name, "status": "error", "error": str(e)}
-    
-    def get_server_status(self, server_name: str) -> Dict[str, Any]:
-        """
-        Get the status of an MCP server.
-        
-        Args:
-            server_name (str): Name of the server to get status for
+            logger.error(f"Error stopping server: {str(e)}")
             
-        Returns:
-            Dict[str, Any]: Server status information
-        """
-        if server_name not in self.config.get("mcpServers", {}):
-            return {"name": server_name, "status": "unknown"}
+            # Fallback: Stop the process directly
+            if server_name not in self.running_servers:
+                return {"status": "not_running", "message": f"Server '{server_name}' is not running"}
             
-        if server_name in self.running_servers:
-            server_info = self.running_servers[server_name]
-            process = server_info["process"]
-            
-            # Check if the process is still running
-            if process.poll() is None:
-                return {
-                    "name": server_name,
-                    "status": "running",
-                    "start_time": server_info["start_time"],
-                    "uptime": time.time() - server_info["start_time"],
-                    "stdout_lines": len(server_info["stdout"]),
-                    "stderr_lines": len(server_info["stderr"])
-                }
-            else:
-                # Process has exited
-                exit_code = process.returncode
-                # Remove from running servers
+            process = self.running_servers[server_name]
+            if not hasattr(process, "terminate"):
                 del self.running_servers[server_name]
+                return {"status": "error", "message": f"Server '{server_name}' cannot be terminated"}
+            
+            try:
+                # Try to terminate the process gracefully
+                process.terminate()
                 
-                return {
-                    "name": server_name,
-                    "status": "exited",
-                    "exit_code": exit_code
-                }
-        else:
-            return {"name": server_name, "status": "stopped"}
+                # Wait a bit for graceful termination
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # If it doesn't terminate gracefully, force kill
+                    process.kill()
+                
+                del self.running_servers[server_name]
+                return {"status": "stopped", "message": f"Server '{server_name}' stopped successfully"}
+            except Exception as e:
+                return {"status": "error", "message": f"Error stopping server '{server_name}' directly: {str(e)}"}
     
-    def get_server_output(self, server_name: str, stream: str = "stdout", max_lines: int = 100) -> Dict[str, Any]:
-        """
-        Get the output from an MCP server.
-        
-        Args:
-            server_name (str): Name of the server to get output for
-            stream (str): Which stream to get output from ('stdout' or 'stderr')
-            max_lines (int): Maximum number of lines to return
-            
-        Returns:
-            Dict[str, Any]: Server output information
-        """
-        if server_name not in self.running_servers:
-            return {"name": server_name, "status": "not_running", "lines": []}
-            
-        server_info = self.running_servers[server_name]
-        
-        if stream == "stdout":
-            lines = server_info["stdout"][-max_lines:] if max_lines > 0 else server_info["stdout"]
-        elif stream == "stderr":
-            lines = server_info["stderr"][-max_lines:] if max_lines > 0 else server_info["stderr"]
-        else:
-            lines = []
-            
-        return {
-            "name": server_name,
-            "status": "running",
-            "stream": stream,
-            "lines": lines
-        }
-    
-    def update_config(self, new_config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Update the MCP configuration.
-        
-        Args:
-            new_config (Dict[str, Any]): New configuration to update with
-            
-        Returns:
-            Dict[str, Any]: Updated configuration
-        """
-        # Merge the new config with the existing one
-        if "mcpServers" in new_config:
-            for server_name, server_config in new_config["mcpServers"].items():
-                self.config.setdefault("mcpServers", {})[server_name] = server_config
-        
-        # Save the updated config
-        with open(self.config_path, 'w') as f:
-            json.dump(self.config, f, indent=2, sort_keys=True)
-            
-        return self.config 
-
     def save_content_to_file(self, content: str, prefix: str = "mcp_output", file_format: str = "md") -> Dict[str, Any]:
         """
         Save content from an MCP operation to a file.
