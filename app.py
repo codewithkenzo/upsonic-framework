@@ -985,6 +985,63 @@ def youtube_scraper_cmd(args):
     except Exception as e:
         print(f"Error launching YouTube scraper: {e}")
 
+def desktop_commander_cmd(args):
+    """Launch the Desktop Commander in browser mode"""
+    try:
+        import webbrowser
+        import subprocess
+        import time
+        from pathlib import Path
+        import os
+        
+        # Start the Desktop Commander server
+        script_path = Path(__file__).parent / "scripts" / "desktop_commander_mcp.py"
+        
+        if not script_path.exists():
+            print(f"Error: Desktop Commander script not found at {script_path}")
+            return
+            
+        print(f"Starting Desktop Commander server at {script_path}...")
+        
+        # Ensure the script is executable
+        os.chmod(str(script_path), 0o755)
+        
+        # Start the server in the background
+        server_process = subprocess.Popen(
+            [sys.executable, str(script_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        # Give the server a moment to start
+        time.sleep(2)
+        
+        # Construct the URL for the MCP inspector with our server
+        url = "https://inspector.modelcontextprotocol.io/?server=stdio&server-path=" + os.path.abspath(str(script_path))
+        
+        print(f"Opening Desktop Commander in MCP Inspector: {url}")
+        webbrowser.open(url)
+        
+        print("\nDesktop Commander is running. Press Ctrl+C to stop.")
+        
+        try:
+            # Keep the server running until user interrupts
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nStopping Desktop Commander...")
+        finally:
+            server_process.terminate()
+            try:
+                server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server_process.kill()
+                
+        print("Desktop Commander stopped.")
+        
+    except Exception as e:
+        print(f"Error launching Desktop Commander: {e}")
+
 def main():
     """Main entry point for the CLI."""
     # Set up the interrupt handler for graceful exits
@@ -1114,6 +1171,10 @@ Examples:
     youtube_parser = subparsers.add_parser('youtube-scraper', help='Launch interactive YouTube scraper')
     youtube_parser.set_defaults(func=youtube_scraper_cmd)
     
+    # Add Desktop Commander parser
+    desktop_parser = subparsers.add_parser('desktop-commander', help='Launch interactive Desktop Commander')
+    desktop_parser.set_defaults(func=desktop_commander_cmd)
+    
     # Parse arguments
     args = parser.parse_args()
     
@@ -1149,6 +1210,8 @@ Examples:
         unified_mcp_chat_cmd(args)
     elif args.command == "youtube-scraper":
         youtube_scraper_cmd(args)
+    elif args.command == "desktop-commander":
+        desktop_commander_cmd(args)
     else:
         parser.print_help()
 
